@@ -1,0 +1,6 @@
+.DS_Store
+__pycache__/
+
+# Per-machine tool state
+.claude/settings.local.json
+.config/cc-allow/
