@@ -11,9 +11,8 @@ import RexGridCore
 /// take focus.
 @MainActor
 func bringRexForward() {
-    let bundleID = "com.superlogical.rex"
-    let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first?.bundleURL
-    guard let url = running ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return }
+    let running = NSRunningApplication.runningApplications(withBundleIdentifier: rexBundleID).first?.bundleURL
+    guard let url = running ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: rexBundleID) else { return }
     let configuration = NSWorkspace.OpenConfiguration()
     configuration.activates = true
     NSWorkspace.shared.openApplication(at: url, configuration: configuration) { _, error in

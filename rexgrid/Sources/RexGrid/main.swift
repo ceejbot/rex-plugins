@@ -12,16 +12,39 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let store: Store
     private var panel: FloatingPanel?
+    /// A height the grid reported before the panel existed to take it.
+    private var earlyHeight: CGFloat?
 
     init(store: Store) {
         self.store = store
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let panel = FloatingPanel(rootView: GridView(store: store))
-        panel.orderFrontRegardless()
+        let presence = Presence()
+        let grid = GridView(store: store, presence: presence) { [weak self] height in
+            self?.fit(height, compact: presence.compact)
+        }
+        let panel = FloatingPanel(rootView: grid, presence: presence)
         self.panel = panel
+        // The grid is laid out, and reports its first height, while the
+        // panel is still being built. A compact panel may never report again.
+        if let earlyHeight { panel.fit(contentHeight: earlyHeight) }
+        panel.orderFrontRegardless()
         store.start()
+    }
+
+    /// Passes the content's height to the panel, and logs it: a panel that
+    /// looks the wrong size can then be told apart from one that was asked
+    /// to be.
+    @MainActor
+    private func fit(_ height: CGFloat, compact: Bool) {
+        let cells = store.board.cells.count
+        panelLog.notice("content: \(cells) cells, compact \(compact), \(Int(height)) high")
+        if let panel {
+            panel.fit(contentHeight: height)
+        } else {
+            earlyHeight = height
+        }
     }
 
     // The panel is the whole app: closing it quits.

@@ -161,6 +161,63 @@ log is read with
 `/usr/bin/log show --last 5m --predicate 'subsystem == "local.rexgrid"'`
 (in zsh, plain `log` is a shell builtin).
 
+### Size, and staying out of the way (2026-11-10)
+
+A day of use turned up two problems. The panel sat on top of Rex while Rex
+was in use, and a third session went unseen because the panel was only tall
+enough for two.
+
+- The panel's height follows its content; its width is the user's. The top
+  edge holds still and the panel grows and shrinks downward. It slides up
+  only if its bottom would leave the screen, and scrolls only if the content
+  is taller than the screen. Dragging the height snaps back when the drag
+  ends.
+- While Rex is the frontmost app the panel shows only its header row, the
+  colored counts. Putting the pointer on it brings the grid back, so a cell
+  can still be clicked from inside Rex. It collapses 300 ms after the pointer
+  leaves.
+- The compact strip is half transparent (`compactAlpha` in `FloatingPanel`),
+  because even one row covers text on a laptop screen. The full grid is
+  always opaque.
+- Both are one mechanism. `GridView` reports the height that would show
+  everything, and `FloatingPanel.fit` moves the window to it. Compact is the
+  content shrinking to one row.
+- `PanelFrame` and `GridMetrics` in `RexGridCore` hold the arithmetic. The
+  view takes its column count from `GridMetrics` and the panel takes its
+  height from the same numbers.
+
+Checked: 42 tests pass. With another app frontmost, a temporary tab running
+`sleep` took the window from 448 to 578 points high and back, top edge
+unmoved, read from the window server with `CGWindowListCopyWindowInfo` and
+matching the app's log. With Rex frontmost the window server held the panel
+at 28 points high, top edge unmoved, and at 448 again once another app came
+forward.
+
+Confirmed by eye the same day: the collapse to the title bar row, the dimmed
+strip (the window server reported its alpha as 0.5), the return to full
+opacity, and the grid reappearing when another app comes forward. Nobody has
+reported on whether the hover flaps at the panel's edge. The log has
+a `panel` category for this: every content height, every frame the window
+took, every change of frontmost app, every hover.
+
+Things learned building that:
+
+- A lazy grid knows its height only from rows it has drawn. In a collapsed
+  panel it has drawn none, so its measured height can't be what the panel
+  grows back to. The height is computed from the cell count.
+- The stack's height less the scroll view's height is everything that isn't
+  grid, and it is the same at any window size. That gives an ideal height
+  that doesn't move while the window resizes toward it.
+- `NSWindow.inLiveResize` is true during AppKit's own animated `setFrame`,
+  not only during a user's drag. The panel resizes without animation so the
+  flag means one thing.
+- `NSHostingView` holds its window to the content's minimum size unless
+  `sizingOptions` is emptied. That minimum was 56 points for a 28-point
+  header, and a panel asking for 28 never got there.
+- SwiftUI lays a view out and reports its geometry while the window is
+  still being built. A callback into an object that will hold the window
+  has to keep what arrives early.
+
 Things learned building it:
 
 - Rex keeps two kinds of state, and showing a pane needs both changed.

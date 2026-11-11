@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import Testing
 
@@ -334,5 +335,65 @@ private func blockEvent(_ name: String, block: String = "block:1", payload: Stri
         #expect(RexCLI.locate(environment: ["PATH": "/nonexistent", "HOME": "/nonexistent"]) == nil
             || FileManager.default.isExecutableFile(atPath: "/opt/homebrew/bin/rex")
             || FileManager.default.isExecutableFile(atPath: "/usr/local/bin/rex"))
+    }
+}
+
+@Suite struct PanelFitting {
+    // A 1440×900 screen with a 25-point menu bar and a 70-point Dock.
+    private let visible = CGRect(x: 0, y: 70, width: 1440, height: 805)
+    // Top edge at y = 800.
+    private let current = CGRect(x: 900, y: 500, width: 520, height: 300)
+
+    private func fit(_ contentHeight: CGFloat, from frame: CGRect? = nil) -> CGRect {
+        PanelFrame.fitting(current: frame ?? current, contentHeight: contentHeight, visible: visible, minimumHeight: 36)
+    }
+
+    @Test func growsDownwardWithTheTopEdgeHeld() {
+        #expect(fit(430) == CGRect(x: 900, y: 370, width: 520, height: 430))
+    }
+
+    @Test func shrinksWithTheTopEdgeHeld() {
+        #expect(fit(36) == CGRect(x: 900, y: 764, width: 520, height: 36))
+    }
+
+    @Test func slidesUpWhenTheBottomWouldLeaveTheScreen() {
+        // Top edge at 300: 430 points below it would end at -130.
+        let low = CGRect(x: 900, y: 264, width: 520, height: 36)
+        #expect(fit(430, from: low) == CGRect(x: 900, y: 70, width: 520, height: 430))
+    }
+
+    @Test func tallContentIsCappedAtTheVisibleHeight() {
+        #expect(fit(2000) == CGRect(x: 900, y: 70, width: 520, height: 805))
+    }
+
+    @Test func neverShorterThanTheMinimum() {
+        #expect(fit(0) == CGRect(x: 900, y: 764, width: 520, height: 36))
+    }
+
+    @Test func fractionalHeightsRoundUpSoNothingIsClipped() {
+        #expect(fit(157.5).height == 158)
+    }
+}
+
+@Suite struct GridSizing {
+    private let metrics = GridMetrics.standard
+
+    @Test func aRowHoldsAsManyCellsAsFit() {
+        #expect(metrics.columns(fitting: 0) == 1)
+        #expect(metrics.columns(fitting: 230) == 1)
+        // Two cells need 230 + 8 + 230.
+        #expect(metrics.columns(fitting: 467) == 1)
+        #expect(metrics.columns(fitting: 468) == 2)
+        // The default 520-point panel, less its side padding.
+        #expect(metrics.columns(fitting: 500) == 2)
+        #expect(metrics.columns(fitting: 706) == 3)
+    }
+
+    @Test func heightCountsRowsAndTheGapsBetweenThem() {
+        #expect(metrics.height(cells: 0, columns: 2) == 0)
+        #expect(metrics.height(cells: 2, columns: 2) == 122)
+        // The third session starts a second row.
+        #expect(metrics.height(cells: 3, columns: 2) == 252)
+        #expect(metrics.height(cells: 3, columns: 1) == 382)
     }
 }
